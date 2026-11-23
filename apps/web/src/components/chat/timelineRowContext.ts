@@ -120,6 +120,7 @@ export interface TimelineRowActivityState {
   latestRunId: RunId | null;
   backgroundWorktreeSetup: WorktreeSetupSnapshot | null;
   liveAnswerPreview: string | null;
+  turnOutputTokens: number | null;
 }
 
 export const TimelineRowCtx = createContext<TimelineRowSharedState>(null!);

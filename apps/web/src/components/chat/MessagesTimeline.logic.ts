@@ -1,5 +1,6 @@
 import * as DateTime from "effect/DateTime";
 import { msg } from "gt-react";
+import { formatContextWindowTokens } from "~/lib/contextWindow";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
 import {
@@ -1079,6 +1080,7 @@ function deriveTurnFolds(input: {
   runlessWorkActive: boolean;
   liveSubagentEntryIds: ReadonlySet<string>;
   retainedAssistantReplyEntryIds: ReadonlySet<string>;
+  runOutputTokens?: ReadonlyMap<RunId, number> | undefined;
   resolve: MessageResolver;
 }): ReadonlyMap<string, TurnFold> {
   const interruptedRunIds = new Set<RunId>();
@@ -1269,6 +1271,15 @@ function deriveTurnFolds(input: {
       : duration
         ? resolve(msg("Worked for {duration}", { duration }))
         : resolve(msg("Worked"));
+    const runTokens = input.runOutputTokens?.get(runId);
+    const tokensSuffix = runTokens
+      ? ` ${resolve(
+          msg("· ↓ {tokens} tokens", {
+            tokens: formatContextWindowTokens(runTokens),
+            $context: "output tokens generated so far in the running turn",
+          }),
+        )}`
+      : "";
 
     // The top row keeps the whole turn's time, steers included. Work after a
     // steer folds under its own row below that steer, keyed apart from the run
@@ -1282,7 +1293,7 @@ function deriveTurnFolds(input: {
       createdAt: group.startBoundary ?? firstEntry.createdAt,
       hiddenEntryIds: segmentHiddenIds(firstSegment),
       entryIds: new Set(firstSegment.map((entry) => entry.id)),
-      label,
+      label: label + tokensSuffix,
     });
     for (const [index, { startIndex, steer }] of group.steerSegments.entries()) {
       const entries = group.entries.slice(startIndex, group.steerSegments[index + 1]?.startIndex);
@@ -1623,6 +1634,8 @@ export function deriveMessagesTimelineRows(
     /** Native subagent work has no app run; runless entries form the live response. */
     runlessWorkActive?: boolean;
     activeTurnStartedAt?: string | null;
+    /** Output tokens per finished run, shown beside its "Worked for" label. */
+    runOutputTokens?: ReadonlyMap<RunId, number>;
     turnDiffSummaries: ReadonlyArray<TurnDiffSummary>;
     supportsConversationRollback: boolean;
     threadStartCheckpointAvailable?: boolean;
@@ -1699,6 +1712,7 @@ export function deriveMessagesTimelineRows(
           runlessWorkActive,
           liveSubagentEntryIds,
           retainedAssistantReplyEntryIds: retainedAssistantReplyIds,
+          runOutputTokens: input.runOutputTokens,
           resolve,
         });
   const timelineEntryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));

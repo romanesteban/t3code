@@ -5247,6 +5247,8 @@ interface ActiveClaudeTurnContext {
     requestedAt?: DateTime.Utc;
     usage: ClaudeMessageUsage | null;
   } | null;
+  // Latest output count per model request, keyed by message id, so repeated reports of one request count once.
+  readonly outputTokensByMessageId: Map<string, number>;
   compactionTokens: number | undefined;
   readonly toolCalls: Map<string, ActiveClaudeToolCall>;
   // A successful status can precede the boundary that supplies its token counts.
@@ -6561,9 +6563,17 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           // Only message_start marks the request start; an assistant snapshot
           // arrives after generation, so it leaves the cache expiry unknown.
           if (requestStarted && context.streamUsage !== null) context.streamUsage.requestedAt = now;
+          if (typeof usage !== "number" && context.streamUsage !== null) {
+            context.outputTokensByMessageId.set(
+              context.streamUsage.messageId,
+              optionalClaudeUsageTokenCount(usage.output_tokens) ?? 0,
+            );
+          }
+          let turnOutputTokens = 0;
+          for (const count of context.outputTokensByMessageId.values()) turnOutputTokens += count;
           const maxTokens = claudeContextWindow(context.input.modelSelection);
-          const tokenUsage =
-            typeof usage === "number"
+          const tokenUsage = {
+            ...(typeof usage === "number"
               ? {
                   usedTokens: usage,
                   maxTokens,
@@ -6576,7 +6586,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   DateTime.formatIso(now),
                   context.autoCompactWindow,
                   context.streamUsage?.requestedAt,
-                );
+                )),
+            turnOutputTokens,
+          };
           if (typeof usage !== "number") {
             if (claudeMessageInputTokens(usage) <= 0) return;
             context.compactionTokens = undefined;
@@ -13765,6 +13777,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 blocks: new Map(),
               },
               streamUsage: null,
+              outputTokensByMessageId: new Map(),
               compactionTokens: undefined,
               toolCalls: new Map(),
               compaction: null,

@@ -4547,6 +4547,7 @@
   "a3048aaa541b7744": "Activity",
   "4a3cbccb2beedeb0": "image",
   "36fb7b9046d2e288": "Tool calls",
+  "1c44dab6bd171466": "· ↓ {tokens} tokens",
   "e81991d4a58ce959": "Setup script",
   "512e5f7d08325a74": "Background setup is still running: {scriptName}. Show setup progress.",
   "ff6edf13509031be": "Setting up worktree…",

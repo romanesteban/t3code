@@ -360,6 +360,7 @@ import {
   deriveLatestContextWindowSnapshot,
   hasDismissedResumeCompaction,
   latestProviderTurnTokenUsage,
+  runOutputTokensByRunId,
   shouldOfferResumeCompaction,
 } from "@t3tools/client-runtime/state/context-window";
 import {
@@ -575,6 +576,12 @@ export default function ChatView(props: ChatViewProps) {
     serverProjection,
     activeProviderThread,
   );
+  const activeTurnOutputTokens =
+    latestProviderTurnTokenUsage(
+      (serverProjection?.providerTurns ?? []).filter((turn) => turn.status === "running"),
+      null,
+      activeProviderThread,
+    )?.turnOutputTokens ?? null;
   const serverVisibleTurnItems = useQuietThreadVisibleTurnItems(routeThreadDetailRef);
   const serverThreadHistory = useThreadHistory(routeThreadDetailRef);
   const threadHistoryControls = (() => {
@@ -3650,6 +3657,11 @@ export default function ChatView(props: ChatViewProps) {
                       ? messages(activeActivityRun.providerStartingLabelMsg)
                       : null
                   }
+                  turnOutputTokens={activeTurnOutputTokens}
+                  runOutputTokens={runOutputTokensByRunId(
+                    serverProjection?.attempts ?? [],
+                    serverProjection?.providerTurns ?? [],
+                  )}
                   worktreeSetup={worktreeSetup}
                   onCancelWorktreeSetup={onCancelWorktreeSetupStable}
                   retryableWorkspacePreparationRunIds={retryableWorkspacePreparationRunIds}

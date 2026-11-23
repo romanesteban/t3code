@@ -9,6 +9,7 @@ import {
 } from "@t3tools/client-runtime/work-log/presentation";
 import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
 import { useAssetUrls } from "~/assets/assetUrls";
+import { formatContextWindowTokens } from "~/lib/contextWindow";
 import { observeResize } from "~/lib/observeResize";
 import { tickTextContent } from "~/lib/tickTextContent";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
@@ -349,7 +350,8 @@ function ExpandedWorkGroupEntries({
 const workEntryKey = (entry: TimelineWorkEntry) => entry.id;
 
 export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
-  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
+  const gt = useGT();
+  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup, turnOutputTokens } =
     use(TimelineRowActivityCtx);
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
@@ -374,6 +376,14 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
           {label}
           {shimmer ? <ActivityShimmerOverlay>{label}</ActivityShimmerOverlay> : null}
         </span>
+        {turnOutputTokens !== null && turnOutputTokens > 0 && !isPreparingWorktree ? (
+          <span className="shrink-0 whitespace-nowrap">
+            {gt("· ↓ {tokens} tokens", {
+              tokens: formatContextWindowTokens(turnOutputTokens),
+              $context: "output tokens generated so far in the running turn",
+            })}
+          </span>
+        ) : null}
         {backgroundWorktreeSetup ? (
           <BackgroundWorktreeSetupChip snapshot={backgroundWorktreeSetup} />
         ) : null}

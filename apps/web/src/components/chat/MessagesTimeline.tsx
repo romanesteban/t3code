@@ -142,7 +142,12 @@ import {
 } from "./timelineViewport";
 import { useThreadFindPositionReader } from "./useThreadFindPositionReader";
 import { ThreadActivityAnnouncer } from "./ThreadActivityAnnouncer";
-import { useStableHandoffRuns, useIncrementalTimelineRows, useStableRows } from "./useTimelineRows";
+import {
+  useStableHandoffRuns,
+  useIncrementalTimelineRows,
+  useStableMap,
+  useStableRows,
+} from "./useTimelineRows";
 import { useClientSettings } from "../../hooks/useSettings";
 
 function timelineListStateFor(identity: string): {
@@ -206,6 +211,7 @@ const TIMELINE_MAINTAIN_SCROLL_AT_END = {
   },
 } as const satisfies MaintainScrollAtEndOptions;
 const EMPTY_RUN_IDS: ReadonlySet<RunId> = new Set();
+const EMPTY_RUN_OUTPUT_TOKENS: ReadonlyMap<RunId, number> = new Map();
 const EMPTY_TIMELINE_ENTRIES: ReadonlyArray<TimelineEntry> = [];
 const TIMELINE_MAINTAIN_SCROLL_AT_END_SMOOTH = {
   ...TIMELINE_MAINTAIN_SCROLL_AT_END,
@@ -241,6 +247,9 @@ interface MessagesTimelineProps {
   activeTurnStartedAt?: string | null;
   /** Replaces "Thinking" while the active run's provider has not started a turn. */
   providerStartingLabel?: string | null;
+  /** Output tokens the running turn has generated so far, shown beside the working timer. */
+  turnOutputTokens?: number | null;
+  runOutputTokens?: ReadonlyMap<RunId, number>;
   worktreeSetup?: WorktreeSetupSnapshot | null;
   onCancelWorktreeSetup?: () => void;
   retryableWorkspacePreparationRunIds?: ReadonlySet<RunId>;
@@ -365,6 +374,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
   runlessWorkActive = false,
   activeTurnStartedAt = null,
   providerStartingLabel = null,
+  turnOutputTokens = null,
+  runOutputTokens: runOutputTokensProp = EMPTY_RUN_OUTPUT_TOKENS,
   worktreeSetup = null,
   footer = null,
   onCancelWorktreeSetup,
@@ -748,6 +759,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const pendingApprovalRequestIds = new Set(
     pendingApprovals.filter(isVisiblePendingApproval).map((approval) => approval.requestId),
   );
+  const runOutputTokens = useStableMap(runOutputTokensProp);
   const rawRows = useIncrementalTimelineRows(`${listIdentityKey}\0${workspaceRoot ?? ""}`, {
     timelineEntries,
     pendingApprovalRequestIds,
@@ -760,6 +772,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     isWorking,
     runlessWorkActive,
     activeTurnStartedAt,
+    runOutputTokens,
     turnDiffSummaries,
     supportsConversationRollback,
     threadStartCheckpointAvailable,
@@ -1195,6 +1208,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     latestRunId: latestRun?.runId ?? null,
     liveAnswerPreview:
       isWorking && toolCallVisibility === "zen" ? liveAnswerPreview(timelineEntries) : null,
+    turnOutputTokens,
   };
   // Mounted in both the empty and filled timeline so a thread's first turn
   // starts from a baseline instead of a fresh, silent region.

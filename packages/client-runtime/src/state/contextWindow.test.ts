@@ -3,6 +3,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   ProviderThreadId,
+  RunAttemptId,
   RunId,
   type ServerProvider,
   type ServerSettings,
@@ -14,7 +15,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
-import { compactBeforeSendTokens } from "./contextWindow.ts";
+import { compactBeforeSendTokens, runOutputTokensByRunId } from "./contextWindow.ts";
 import type { ThreadStructure } from "./models.ts";
 import { v2Projection } from "./orchestrationV2TestFixtures.ts";
 
@@ -260,5 +261,29 @@ describe("compactBeforeSendTokens", () => {
     expect(compactBeforeSendTokens(sendInput(overrides as Parameters<typeof sendInput>[0]))).toBe(
       expected ? 293_611 : null,
     );
+  });
+});
+
+describe("runOutputTokensByRunId", () => {
+  it("sums every attempt's report into its run and skips turns without one", () => {
+    const usage = (turnOutputTokens?: number) => ({
+      usedTokens: 0,
+      updatedAt: lastTurnAt,
+      ...(turnOutputTokens === undefined ? {} : { turnOutputTokens }),
+    });
+    const totals = runOutputTokensByRunId(
+      [
+        { id: RunAttemptId.make("a1"), runId: RunId.make("run-1") },
+        { id: RunAttemptId.make("a2"), runId: RunId.make("run-1") },
+        { id: RunAttemptId.make("b1"), runId: RunId.make("run-2") },
+      ],
+      [
+        { runAttemptId: RunAttemptId.make("a1"), tokenUsage: usage(120) },
+        { runAttemptId: RunAttemptId.make("a2"), tokenUsage: usage(30) },
+        { runAttemptId: RunAttemptId.make("b1"), tokenUsage: usage() },
+        { runAttemptId: null, tokenUsage: usage(999) },
+      ],
+    );
+    expect([...totals]).toEqual([[RunId.make("run-1"), 150]]);
   });
 });

@@ -4545,6 +4545,7 @@
   "a3048aaa541b7744": "Actividad",
   "4a3cbccb2beedeb0": "imagen",
   "36fb7b9046d2e288": "Llamadas a herramientas",
+  "1c44dab6bd171466": "· ↓ {tokens} tokens",
   "e81991d4a58ce959": "Script de configuración",
   "512e5f7d08325a74": "La configuración en segundo plano aún se está ejecutando: {scriptName}. Mostrar el progreso.",
   "ff6edf13509031be": "Configurando el worktree…",

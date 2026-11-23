@@ -1,5 +1,6 @@
 import { useLocale, useMessages } from "gt-react";
 import { useState } from "react";
+import { shallow } from "zustand/vanilla/shallow";
 import {
   computeStableMessagesTimelineRows,
   handoffRunsSignature,
@@ -64,6 +65,14 @@ export function useIncrementalTimelineRows(
   );
   setState({ identity, input, locale, projection });
   return projection.rows;
+}
+
+/** Keeps the previous map while its entries match, so row derivation can reuse its last result. */
+export function useStableMap<K, V>(map: ReadonlyMap<K, V>): ReadonlyMap<K, V> {
+  const [stable, setStable] = useState(map);
+  if (stable === map || shallow(stable, map)) return stable;
+  setStable(map);
+  return map;
 }
 
 export function useStableRows(

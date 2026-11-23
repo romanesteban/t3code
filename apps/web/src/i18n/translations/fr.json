@@ -4546,6 +4546,7 @@
   "a3048aaa541b7744": "Activité",
   "4a3cbccb2beedeb0": "image",
   "36fb7b9046d2e288": "Appels d’outils",
+  "1c44dab6bd171466": "· ↓ {tokens} jetons",
   "e81991d4a58ce959": "Script de configuration",
   "512e5f7d08325a74": "La configuration en arrière-plan est toujours en cours : {scriptName}. Afficher la progression.",
   "ff6edf13509031be": "Configuration du worktree…",

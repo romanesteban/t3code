@@ -264,6 +264,8 @@ export const OrchestrationV2ProviderTurnTokenUsage = Schema.Struct({
   promptCacheTtlMs: Schema.optional(PositiveInt),
   autoCompactThreshold: Schema.optional(PositiveInt),
   promptCacheExpiresAt: Schema.optional(Schema.String),
+  /** Output tokens summed over every model request in this turn so far; the fields above describe only the latest request. */
+  turnOutputTokens: Schema.optional(NonNegativeInt),
   updatedAt: Schema.String,
 });
 export type OrchestrationV2ProviderTurnTokenUsage =

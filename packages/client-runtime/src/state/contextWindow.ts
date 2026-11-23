@@ -4,6 +4,8 @@ import {
   type OrchestrationV2ProviderTurn,
   type OrchestrationV2ProviderTurnTokenUsage,
   type OrchestrationV2ProviderThread,
+  type OrchestrationV2RunAttempt,
+  type RunId,
   type ServerProvider,
   type ServerSettings,
   type ThreadTokenUsageSnapshot,
@@ -74,6 +76,21 @@ export function latestProviderTurnTokenUsage(
         (transfer.status === "pending" || transfer.resolution?.strategy === "native_fork"),
     )?.sourceTokenUsage ?? null
   );
+}
+
+/** Output tokens each run generated, summed over its attempts' provider turns; runs without a report are absent. */
+export function runOutputTokensByRunId(
+  attempts: ReadonlyArray<Pick<OrchestrationV2RunAttempt, "id" | "runId">>,
+  providerTurns: ReadonlyArray<Pick<OrchestrationV2ProviderTurn, "runAttemptId" | "tokenUsage">>,
+): ReadonlyMap<RunId, number> {
+  const runIdByAttemptId = new Map(attempts.map((attempt) => [attempt.id, attempt.runId]));
+  const totals = new Map<RunId, number>();
+  for (const { runAttemptId, tokenUsage } of providerTurns) {
+    const runId = runAttemptId === null ? undefined : runIdByAttemptId.get(runAttemptId);
+    if (runId === undefined || tokenUsage?.turnOutputTokens === undefined) continue;
+    totals.set(runId, (totals.get(runId) ?? 0) + tokenUsage.turnOutputTokens);
+  }
+  return totals;
 }
 
 type CompactionItem = Extract<ThreadStructureTurnItem, { readonly type: "compaction" }>;
