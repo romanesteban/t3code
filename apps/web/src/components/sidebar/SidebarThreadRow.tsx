@@ -176,7 +176,7 @@ export function JumpHintBadge(props: { label: string }) {
 export const JUMP_HINT_SLOT_CLASS_NAME =
   "[&>:not([data-jump-hint])]:invisible [&>:not([data-jump-hint])]:absolute";
 
-function WorkingDuration(props: { environmentId: EnvironmentId; startedAt: string | null }) {
+export function WorkingDuration(props: { environmentId: EnvironmentId; startedAt: string | null }) {
   const startedMs = props.startedAt !== null ? Date.parse(props.startedAt) : Number.NaN;
   if (Number.isNaN(startedMs)) return null;
   return <WorkingDurationLabel environmentId={props.environmentId} startedMs={startedMs} />;
@@ -193,6 +193,20 @@ function WorkingDurationLabel(props: { environmentId: EnvironmentId; startedMs: 
         toServerClock(props.environmentId, nowMs) - props.startedMs,
         messages,
       )}
+    </span>
+  );
+}
+
+export function RunOutputTokens(props: { tokens: number | undefined }) {
+  const gt = useGT();
+  if (props.tokens === undefined || props.tokens === 0) return null;
+  return (
+    <span className="tabular-nums">
+      {" "}
+      {gt("· ↓ {tokens} tokens", {
+        tokens: formatContextWindowTokens(props.tokens),
+        $context: "output tokens generated so far in the running turn",
+      })}
     </span>
   );
 }
@@ -1635,17 +1649,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                                 environmentId={thread.environmentId}
                                 startedAt={resolveWorkingStartedAt(thread)}
                               />
-                              {status === "working" &&
-                              (thread.source.latestRunOutputTokens ?? 0) > 0 ? (
-                                <span className="tabular-nums">
-                                  {" "}
-                                  {gt("· ↓ {tokens} tokens", {
-                                    tokens: formatContextWindowTokens(
-                                      thread.source.latestRunOutputTokens ?? 0,
-                                    ),
-                                    $context: "output tokens generated so far in the running turn",
-                                  })}
-                                </span>
+                              {status === "working" ? (
+                                <RunOutputTokens tokens={thread.source.latestRunOutputTokens} />
                               ) : null}
                             </span>
                           ) : status === "waiting" ? (
