@@ -1,5 +1,3 @@
-import { isListedThreadLineage } from "@t3tools/contracts";
-
 import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "../Sidebar.logic";
 import type { SidebarThreadSummary } from "../../types";
 
@@ -43,14 +41,14 @@ export function projectFilterKey(
   return `${thread.environmentId}:${thread.projectId}`;
 }
 
-/** Listed threads with an agent at work or waiting, optionally for one project. */
+/** Threads with an agent at work or waiting, subagents included, optionally for one project. */
 export function selectAgentRows<T extends AgentThreadInput>(
   threads: ReadonlyArray<T>,
   projectKey: string | null,
 ): ReadonlyArray<AgentRow<T>> {
   const rows: Array<AgentRow<T> & { readonly rank: number }> = [];
   for (const thread of threads) {
-    if (!isListedThreadLineage(thread.lineage)) continue;
+    if (thread.lineage.sideChat === true || thread.lineage.workflowStep === true) continue;
     if (projectKey !== null && projectFilterKey(thread) !== projectKey) continue;
     const status = resolveSidebarThreadStatus(thread);
     const rank = STATUS_RANK[status];

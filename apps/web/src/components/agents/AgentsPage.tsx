@@ -1,3 +1,4 @@
+import { formatModelSlugName } from "@t3tools/shared/model";
 import { Link } from "@tanstack/react-router";
 import { T, useGT } from "gt-react";
 import { useState } from "react";
@@ -107,9 +108,17 @@ export function AgentsPage() {
               params={{ environmentId: thread.environmentId, threadId: thread.id }}
               className="flex items-center gap-4 rounded-md px-3 py-2 text-sm hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
-              <span className="min-w-0 flex-1 truncate">{thread.title}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {thread.lineage.relationshipToParent === "subagent" ? (
+                  <span className="text-muted-foreground">↳ </span>
+                ) : null}
+                {thread.title}
+              </span>
               <span className="w-40 shrink-0 truncate text-muted-foreground">
                 {projectTitles.get(projectFilterKey(thread)) ?? ""}
+              </span>
+              <span className="w-36 shrink-0 truncate text-muted-foreground">
+                {formatModelSlugName(thread.modelSelection.model)}
               </span>
               <span className={cn("w-56 shrink-0 truncate font-medium", STATUS_CLASS[status])}>
                 {statusLabel(status)}

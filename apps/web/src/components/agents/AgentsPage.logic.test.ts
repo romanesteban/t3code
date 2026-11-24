@@ -43,7 +43,7 @@ function thread(
 }
 
 describe("selectAgentRows", () => {
-  it("keeps listed threads needing the user, working or waiting, most urgent first", () => {
+  it("keeps threads and subagents needing the user, working or waiting, most urgent first", () => {
     const threads = [
       thread("waiting", { status: "idle" }),
       thread("older-working", { status: "running", updatedAt: "2026-01-01T00:00:00.000Z" }),
@@ -58,6 +58,7 @@ describe("selectAgentRows", () => {
       ["approval", "approval"],
       ["newer-working", "working"],
       ["older-working", "working"],
+      ["subagent", "working"],
       ["preparing", "preparing"],
       ["waiting", "waiting"],
     ]);
