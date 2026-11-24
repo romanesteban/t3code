@@ -2,6 +2,7 @@ import { useAtomMount } from "@effect/atom-react";
 import { asLaunchingThread } from "@t3tools/client-runtime/state/thread-inbox";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadTerminalStatusButton } from "../ThreadStatusIndicators";
+import { formatContextWindowTokens } from "../../lib/contextWindow";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
 import { formatWorktreePathForDisplay } from "../../worktreeCleanup";
 import { contextMenuSourceOf } from "../../contextMenuSource";
@@ -1634,6 +1635,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                                 environmentId={thread.environmentId}
                                 startedAt={resolveWorkingStartedAt(thread)}
                               />
+                              {status === "working" &&
+                              (thread.source.latestRunOutputTokens ?? 0) > 0 ? (
+                                <span className="tabular-nums">
+                                  {" "}
+                                  {gt("· ↓ {tokens} tokens", {
+                                    tokens: formatContextWindowTokens(
+                                      thread.source.latestRunOutputTokens ?? 0,
+                                    ),
+                                    $context: "output tokens generated so far in the running turn",
+                                  })}
+                                </span>
+                              ) : null}
                             </span>
                           ) : status === "waiting" ? (
                             <span aria-hidden>

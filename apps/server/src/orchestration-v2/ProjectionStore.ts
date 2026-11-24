@@ -1267,6 +1267,7 @@ type ShellThreadRow = {
   readonly latest_run_completed_at: string | null;
   readonly latest_run_stop_requested: number;
   readonly latest_run_background_wake: number;
+  readonly latest_run_output_tokens: number | null;
   readonly active_run_id: string | null;
   readonly active_run_status: string | null;
   readonly activity_run_status: string | null;
@@ -1279,6 +1280,7 @@ type ShellThreadRow = {
   readonly blocking_run_completed_at: string | null;
   readonly blocking_run_stop_requested: number;
   readonly blocking_run_background_wake: number;
+  readonly blocking_run_output_tokens: number | null;
   readonly blocking_failure_payload_json: string | null;
   readonly pending_request_payload_json: string | null;
   readonly pending_secret_request_payload_json: string | null;
@@ -1974,6 +1976,7 @@ export function threadShellFromProjection(
       ),
     latestRunBackgroundWake:
       latestRun != null && isBackgroundWakeRunForShell(latestRun, projection),
+    ...latestRunOutputTokensForShell(latestRun?.id ?? null, projection),
     activeRunId: activeRun?.id ?? null,
     blockedOnThreadWait: deriveBlockedOnThreadWait({ activeRun, turnItems: projection.turnItems }),
     activityRunStatus: activityRun?.status ?? null,
@@ -2103,6 +2106,24 @@ function isActivityRunForShell(
   return isInterruptibleRunForShell(run) || run.status === "waiting";
 }
 
+// Mirrors the SQL shell's runOutputTokens, absent when no provider turn reported output.
+function latestRunOutputTokensForShell(
+  runId: RunId | null,
+  projection: Pick<OrchestrationV2ThreadProjection, "attempts" | "providerTurns">,
+): { readonly latestRunOutputTokens?: number } {
+  const attemptIds = new Set(
+    projection.attempts.filter((attempt) => attempt.runId === runId).map((attempt) => attempt.id),
+  );
+  let total: number | undefined;
+  for (const turn of projection.providerTurns) {
+    const tokens = turn.tokenUsage?.turnOutputTokens;
+    if (tokens !== undefined && turn.runAttemptId !== null && attemptIds.has(turn.runAttemptId)) {
+      total = (total ?? 0) + tokens;
+    }
+  }
+  return total === undefined ? {} : { latestRunOutputTokens: total };
+}
+
 type ShellThreadState = {
   readonly thread: OrchestrationV2ThreadProjection["thread"];
   readonly latestRunId: RunId | null;
@@ -2112,6 +2133,7 @@ type ShellThreadState = {
   readonly latestRunCompletedAt: DateTime.Utc | null;
   readonly latestRunStopRequested: boolean;
   readonly latestRunBackgroundWake: boolean;
+  readonly latestRunOutputTokens: number | null;
   readonly activeRunId: RunId | null;
   readonly blockedOnThreadWait: boolean;
   readonly activityRunStatus: ShellActivityRunStatus | null;
@@ -2286,6 +2308,9 @@ function shellFromState(input: {
     latestRunCompletedAt: input.state.latestRunCompletedAt,
     latestRunStopRequested: input.state.latestRunStopRequested,
     latestRunBackgroundWake: input.state.latestRunBackgroundWake,
+    ...(input.state.latestRunOutputTokens === null
+      ? {}
+      : { latestRunOutputTokens: input.state.latestRunOutputTokens }),
     activeRunId: input.state.activeRunId,
     blockedOnThreadWait: input.state.blockedOnThreadWait,
     activityRunStatus: input.state.activityRunStatus,
@@ -8393,6 +8418,17 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       )`;
     };
 
+    const runOutputTokens = (alias: string) => {
+      const run = sql.literal(alias);
+      return sql`(
+        SELECT SUM(json_extract(turn.payload_json, '$.tokenUsage.turnOutputTokens'))
+        FROM orchestration_v2_projection_run_attempts attempt
+        JOIN orchestration_v2_projection_provider_turns turn
+          ON turn.run_attempt_id = attempt.attempt_id
+        WHERE attempt.run_id = ${run}.run_id
+      )`;
+    };
+
     const selectShellThreadRows = (
       threadId?: ThreadId,
       {
@@ -8432,6 +8468,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   AND stop_request.type = 'run_interrupt_request'
               ) AS latest_run_stop_requested,
               ${isBackgroundWakeShellRun("presented")} AS latest_run_background_wake,
+              ${runOutputTokens("presented")} AS latest_run_output_tokens,
               active.run_id AS active_run_id,
               active.status AS active_run_status,
               (
@@ -8493,6 +8530,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   AND stop_request.type = 'run_interrupt_request'
               ) AS blocking_run_stop_requested,
               ${isBackgroundWakeShellRun("blocked")} AS blocking_run_background_wake,
+              ${runOutputTokens("blocked")} AS blocking_run_output_tokens,
               (
                 SELECT item.payload_json
                 FROM orchestration_v2_projection_turn_items item
@@ -9133,6 +9171,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             : DateTime.makeUnsafe(row.latest_run_completed_at);
         let latestRunStopRequested = row.latest_run_stop_requested === 1;
         let latestRunBackgroundWake = row.latest_run_background_wake === 1;
+        let latestRunOutputTokens = row.latest_run_output_tokens;
         if (row.blocking_run_id !== null && row.blocking_failure_payload_json !== null) {
           const blockingFailure = yield* decodeTurnItemPayload(
             row.blocking_failure_payload_json,
@@ -9147,6 +9186,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             latestRunId = RunId.make(row.blocking_run_id);
             latestRunStopRequested = row.blocking_run_stop_requested === 1;
             latestRunBackgroundWake = row.blocking_run_background_wake === 1;
+            latestRunOutputTokens = row.blocking_run_output_tokens;
             latestRunStatus = "failed";
             latestRunRequestedAt =
               row.blocking_run_requested_at === null
@@ -9188,6 +9228,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           latestRunCompletedAt,
           latestRunStopRequested,
           latestRunBackgroundWake,
+          latestRunOutputTokens,
           activeRunId: row.active_run_id === null ? null : RunId.make(row.active_run_id),
           blockedOnThreadWait: deriveBlockedOnThreadWait({
             activeRun:

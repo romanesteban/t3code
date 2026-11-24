@@ -1623,6 +1623,100 @@ it.effect("shells flag a latest run triggered by a provider background wake", ()
   }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("shells sum the latest run's output tokens across its attempts", () =>
+  Effect.gen(function* () {
+    const store = yield* ProjectionStore.ProjectionStoreV2;
+    const threadId = yield* addRolledBackRecoveryCandidate("run-output-tokens");
+    const initial = yield* store.getThreadProjection(threadId);
+    const at = initial.updatedAt;
+    const firstRun = initial.runs[0]!;
+    const runId = RunId.make("run:run-output-tokens:latest");
+    const providerThreadId = ProviderThreadId.make("provider-thread:run-output-tokens");
+    const nodeId = NodeId.make("node:run-output-tokens");
+    const shellTokens = Effect.fnUntraced(function* () {
+      return [
+        (yield* store.getThreadShell(threadId))?.latestRunOutputTokens,
+        ProjectionStore.threadShellFromProjection(yield* store.getThreadProjection(threadId))
+          .latestRunOutputTokens,
+      ];
+    });
+    yield* store.apply({
+      id: EventId.make("event:run-output-tokens:run"),
+      type: "run.created",
+      threadId,
+      runId,
+      occurredAt: at,
+      payload: { ...firstRun, id: runId, ordinal: 2, status: "running", completedAt: null },
+    });
+    assert.deepEqual(yield* shellTokens(), [undefined, undefined]);
+
+    // A retry's tokens count, an earlier run's and an unattributed turn's do not, and a turn
+    // without usage adds nothing.
+    for (const [attempt, attemptRunId, ordinal] of [
+      ["first", runId, 1],
+      ["retry", runId, 2],
+      ["older", firstRun.id, 1],
+    ] as const) {
+      yield* store.apply({
+        id: EventId.make(`event:run-output-tokens:attempt-${attempt}`),
+        type: "run-attempt.created",
+        threadId,
+        runId: attemptRunId,
+        occurredAt: at,
+        payload: {
+          id: RunAttemptId.make(`attempt:run-output-tokens:${attempt}`),
+          runId: attemptRunId,
+          attemptOrdinal: ordinal,
+          rootNodeId: nodeId,
+          providerInstanceId,
+          providerThreadId,
+          providerTurnId: null,
+          reason: ordinal === 1 ? "initial" : "retry",
+          status: "running",
+          startedAt: at,
+          completedAt: null,
+        },
+      });
+    }
+    for (const [turn, attempt, tokens] of [
+      ["first", "first", 120],
+      ["retry", "retry", 30],
+      ["retry-no-usage", "retry", undefined],
+      ["older", "older", 5_000],
+      ["unattributed", null, 7_000],
+    ] as const) {
+      yield* store.apply({
+        id: EventId.make(`event:run-output-tokens:turn-${turn}`),
+        type: "provider-turn.updated",
+        threadId,
+        occurredAt: at,
+        payload: {
+          id: ProviderTurnId.make(`turn:run-output-tokens:${turn}`),
+          providerThreadId,
+          nodeId,
+          runAttemptId:
+            attempt === null ? null : RunAttemptId.make(`attempt:run-output-tokens:${attempt}`),
+          nativeTurnRef: null,
+          ordinal: ["first", "retry", "retry-no-usage", "older", "unattributed"].indexOf(turn) + 1,
+          status: "running",
+          startedAt: at,
+          completedAt: null,
+          ...(tokens === undefined
+            ? {}
+            : {
+                tokenUsage: {
+                  usedTokens: 1_000,
+                  turnOutputTokens: tokens,
+                  updatedAt: DateTime.formatIso(at),
+                },
+              }),
+        },
+      });
+    }
+    assert.deepEqual(yield* shellTokens(), [150, 150]);
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("SQL queue readiness skips held runs without bypassing active work", () =>
   Effect.gen(function* () {
     const store = yield* ProjectionStore.ProjectionStoreV2;
