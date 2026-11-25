@@ -551,6 +551,13 @@ export function shouldPublishShellApplicationEvent(
   if (event.type === "turn-item.updated" && turnItemCanChangeUserWait(event.payload)) {
     return true;
   }
+  // Output token totals feed the subagent's shell, so they pass while transcript churn does not.
+  if (
+    event.type === "provider-turn.updated" &&
+    event.payload.tokenUsage?.turnOutputTokens !== undefined
+  ) {
+    return true;
+  }
   return !(
     subagentThreadIds.has(event.threadId) &&
     (event.type === "node.updated" ||

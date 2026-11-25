@@ -41,7 +41,7 @@ describe("subagent shell events", () => {
   const stored = (threadId: string, type: string, itemType = "command_execution") =>
     ({ event: { threadId, type, payload: { type: itemType } } }) as ApplicationStoredEvent;
 
-  it("keeps regular threads and subagent state changes while omitting subagent transcript updates", () => {
+  it("keeps regular threads, subagent state changes and output tokens while omitting subagent transcript updates", () => {
     const subagents = new Set(["child"]);
     expect(
       shouldPublishShellApplicationEvent(stored("parent", "turn-item.updated"), subagents),
@@ -63,6 +63,17 @@ describe("subagent shell events", () => {
     expect(
       shouldPublishShellApplicationEvent(stored("child", "runtime-request.updated"), subagents),
     ).toBe(true);
+    expect(
+      shouldPublishShellApplicationEvent(stored("child", "provider-turn.updated"), subagents),
+    ).toBe(false);
+    const tokens = {
+      event: {
+        threadId: "child",
+        type: "provider-turn.updated",
+        payload: { tokenUsage: { turnOutputTokens: 120 } },
+      },
+    } as ApplicationStoredEvent;
+    expect(shouldPublishShellApplicationEvent(tokens, subagents)).toBe(true);
     expect(shouldPublishShellApplicationEvent(stored("child", "run.updated"), subagents)).toBe(
       true,
     );
